@@ -240,4 +240,4 @@ public class StalkerEntity extends HostileEntity {
     protected SoundEvent getDeathSound() {
         return SoundEvents.ENTITY_ENDERMAN_DEATH;
     }
-    }
+                         }
