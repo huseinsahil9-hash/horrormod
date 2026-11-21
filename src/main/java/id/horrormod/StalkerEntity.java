@@ -29,6 +29,8 @@ public class StalkerEntity extends HostileEntity {
 
     private static final TrackedData<Integer> STATE =
             DataTracker.registerData(StalkerEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    private static final TrackedData<Integer> VARIANT =
+            DataTracker.registerData(StalkerEntity.class, TrackedDataHandlerRegistry.INTEGER);
 
     public static final int STALK = 0;
     public static final int CRAWL = 1;
@@ -58,6 +60,10 @@ public class StalkerEntity extends HostileEntity {
     public StalkerEntity(EntityType<? extends StalkerEntity> type, World world) {
         super(type, world);
         this.experiencePoints = 10;
+        if (!world.isClient) {
+            // 40% versi berdiri, 60% versi merangkak
+            this.dataTracker.set(VARIANT, this.random.nextInt(100) < 40 ? 1 : 0);
+        }
     }
 
     public static DefaultAttributeContainer.Builder createAttributes() {
@@ -72,6 +78,7 @@ public class StalkerEntity extends HostileEntity {
     protected void initDataTracker() {
         super.initDataTracker();
         this.dataTracker.startTracking(STATE, STALK);
+        this.dataTracker.startTracking(VARIANT, 0);
     }
 
     @Override
@@ -82,6 +89,10 @@ public class StalkerEntity extends HostileEntity {
 
     public int getState() {
         return this.dataTracker.get(STATE);
+    }
+
+    public boolean isUpright() {
+        return this.dataTracker.get(VARIANT) == 1;
     }
 
     private void setState(int s) {
@@ -194,7 +205,8 @@ public class StalkerEntity extends HostileEntity {
     }
 
     private void jumpscare(PlayerEntity target) {
-        this.tryAttack(target);
+        // Mematikan (Totem of Undying masih bisa menyelamatkan)
+        target.damage(this.getDamageSources().mobAttack(this), 1000.0f);
         target.addStatusEffect(new StatusEffectInstance(StatusEffects.BLINDNESS, 60, 0));
         World world = this.getWorld();
         world.playSound(null, target.getX(), target.getY(), target.getZ(),
@@ -240,4 +252,4 @@ public class StalkerEntity extends HostileEntity {
     protected SoundEvent getDeathSound() {
         return SoundEvents.ENTITY_ENDERMAN_DEATH;
     }
-                         }
+                }
