@@ -189,4 +189,4 @@ public class HorrorModClient implements ClientModInitializer {
             matrices.scale(1.1f, 1.25f, 1.1f);
         }
     }
-                            }
+}
