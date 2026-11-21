@@ -5,8 +5,8 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.entity.BipedEntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
+import net.minecraft.client.render.entity.model.BipedEntityModel;
 import net.minecraft.client.render.entity.model.EntityModelLayers;
-import net.minecraft.client.render.entity.model.ZombieEntityModel;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.client.util.math.MatrixStack;
@@ -20,13 +20,13 @@ public class HorrorModClient implements ClientModInitializer {
     }
 
     public static class StalkerRenderer
-            extends BipedEntityRenderer<StalkerEntity, ZombieEntityModel<StalkerEntity>> {
+            extends BipedEntityRenderer<StalkerEntity, BipedEntityModel<StalkerEntity>> {
 
         private static final Identifier TEXTURE = new Identifier("horrormod", "stalker_dynamic");
         private static boolean ready = false;
 
         public StalkerRenderer(EntityRendererFactory.Context ctx) {
-            super(ctx, new ZombieEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE)), 0.5f);
+            super(ctx, new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE)), 0.5f);
         }
 
         private static int abgr(int r, int g, int b) {
@@ -73,4 +73,4 @@ public class HorrorModClient implements ClientModInitializer {
             matrices.scale(1.1f, 1.25f, 1.1f);
         }
     }
-              }
+}
