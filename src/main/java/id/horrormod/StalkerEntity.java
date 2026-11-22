@@ -57,15 +57,18 @@ public class StalkerEntity extends HostileEntity {
     private int blinkCooldown = 100;
     private int noPlayerTicks = 0;
     private int watchLeft = 0;
+    private boolean hunter = false;
 
     public StalkerEntity(EntityType<? extends StalkerEntity> type, World world) {
         super(type, world);
         this.experiencePoints = 10;
         if (!world.isClient) {
-            // 40% versi berdiri (tanpa kepala), 60% versi berkepala
+            // 40% versi berdiri tanpa kepala, 60% berkepala
             this.dataTracker.set(VARIANT, this.random.nextInt(100) < 40 ? 1 : 0);
-            // Fase mengintai dari jauh: 20 sampai 50 detik
+            // Fase menatap dari jauh: 20 sampai 50 detik
             this.watchLeft = 400 + this.random.nextInt(600);
+            // 50% pemburu (menyerang), 50% pengintai (menghilang)
+            this.hunter = this.random.nextBoolean();
         }
     }
 
@@ -98,9 +101,14 @@ public class StalkerEntity extends HostileEntity {
         return this.dataTracker.get(VARIANT) == 1;
     }
 
-    // Lewati fase mengintai (dipakai command /stalker near)
+    // Lewati fase menatap (dipakai command /stalker near)
     public void skipWatch() {
         this.watchLeft = 0;
+    }
+
+    // Paksa jadi pemburu (dipakai command /stalker hunt dan near)
+    public void makeHunter() {
+        this.hunter = true;
     }
 
     private void setState(int s) {
@@ -165,18 +173,25 @@ public class StalkerEntity extends HostileEntity {
                 }
 
                 if (this.watchLeft > 0) {
-                    // Mengintai dari jauh: diam, menatap, hilang kalau didekati
+                    // Fase menatap dari jauh: diam di tempat
                     this.watchLeft--;
                     this.getNavigation().stop();
-                    if (dist < 16) {
-                        vanish();
-                        return;
-                    }
-                    if (this.watchLeft == 0 && this.random.nextInt(2) == 0) {
-                        vanish();
-                        return;
+
+                    if (!this.hunter) {
+                        // Pengintai: hilang kalau didekati atau waktunya habis
+                        if (dist < 16 || this.watchLeft == 0) {
+                            vanish();
+                            return;
+                        }
+                    } else {
+                        // Pemburu: begitu dilihat, langsung berubah bentuk lalu menyerang
+                        if (dist < 30 && this.age % 40 == 0) heartbeat(target, 0.9f);
+                        if (observed && dist < 40) {
+                            setState(TILT);
+                        }
                     }
                 } else {
+                    // Pemburu yang tidak pernah dilihat: mendekat saat tidak diperhatikan
                     if (dist < 20 && this.age % 40 == 0) heartbeat(target, 0.9f);
 
                     if (observed) {
@@ -187,7 +202,7 @@ public class StalkerEntity extends HostileEntity {
                                 blink(target);
                             }
                         } else {
-                            setState(CRAWL);
+                            setState(TILT);
                         }
                     } else {
                         if (this.age % 5 == 0) this.getNavigation().startMovingTo(target, 0.6);
@@ -208,7 +223,7 @@ public class StalkerEntity extends HostileEntity {
                 if (this.stateTicks >= 25) setState(CHASE);
             }
             case CHASE -> {
-                if (this.age % 5 == 0) this.getNavigation().startMovingTo(target, 1.0);
+                if (this.age % 5 == 0) this.getNavigation().startMovingTo(target, 1.1);
                 if (this.stateTicks % 10 == 0) heartbeat(target, 1.4f);
                 if (this.stateTicks % 30 == 0) emit(SoundEvents.ENTITY_PHANTOM_SWOOP, 1.5f, 0.5f);
                 if (this.stateTicks % 60 == 0) emit(SoundEvents.ENTITY_ENDERMAN_SCREAM, 1.0f, 0.5f);
@@ -275,4 +290,4 @@ public class StalkerEntity extends HostileEntity {
     protected SoundEvent getDeathSound() {
         return SoundEvents.ENTITY_ENDERMAN_DEATH;
     }
-    }
+                    }
