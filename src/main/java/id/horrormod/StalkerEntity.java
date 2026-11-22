@@ -56,13 +56,16 @@ public class StalkerEntity extends HostileEntity {
     private int lostTicks = 0;
     private int blinkCooldown = 100;
     private int noPlayerTicks = 0;
+    private int watchLeft = 0;
 
     public StalkerEntity(EntityType<? extends StalkerEntity> type, World world) {
         super(type, world);
         this.experiencePoints = 10;
         if (!world.isClient) {
-            // 40% versi berdiri, 60% versi merangkak
+            // 40% versi berdiri (tanpa kepala), 60% versi berkepala
             this.dataTracker.set(VARIANT, this.random.nextInt(100) < 40 ? 1 : 0);
+            // Fase mengintai dari jauh: 20 sampai 50 detik
+            this.watchLeft = 400 + this.random.nextInt(600);
         }
     }
 
@@ -95,14 +98,19 @@ public class StalkerEntity extends HostileEntity {
         return this.dataTracker.get(VARIANT) == 1;
     }
 
+    // Lewati fase mengintai (dipakai command /stalker near)
+    public void skipWatch() {
+        this.watchLeft = 0;
+    }
+
     private void setState(int s) {
         this.dataTracker.set(STATE, s);
         this.stateTicks = 0;
         if (s == CRAWL) {
             emit(SoundEvents.ENTITY_ZOMBIE_VILLAGER_AMBIENT, 1.5f, 0.5f);
         } else if (s == TILT) {
-            emit(SoundEvents.BLOCK_BONE_BLOCK_BREAK, 2.0f, 0.5f);
-            emit(SoundEvents.BLOCK_BONE_BLOCK_STEP, 2.0f, 0.4f);
+            emit(SoundEvents.ENTITY_RAVAGER_ROAR, 2.0f, 0.6f);
+            emit(SoundEvents.ENTITY_ENDERMAN_SCREAM, 1.5f, 0.5f);
         } else if (s == CHASE) {
             emit(SoundEvents.ENTITY_WARDEN_ROAR, 1.5f, 1.0f);
         }
@@ -155,25 +163,40 @@ public class StalkerEntity extends HostileEntity {
                     emit(MIMIC[this.random.nextInt(MIMIC.length)], 1.2f,
                             0.6f + this.random.nextFloat() * 0.3f);
                 }
-                if (dist < 20 && this.age % 40 == 0) heartbeat(target, 0.9f);
 
-                if (observed) {
+                if (this.watchLeft > 0) {
+                    // Mengintai dari jauh: diam, menatap, hilang kalau didekati
+                    this.watchLeft--;
                     this.getNavigation().stop();
-                    if (dist > 30) {
-                        if (this.blinkCooldown <= 0) {
-                            this.blinkCooldown = 60;
-                            blink(target);
-                        }
-                    } else {
-                        setState(CRAWL);
+                    if (dist < 16) {
+                        vanish();
+                        return;
+                    }
+                    if (this.watchLeft == 0 && this.random.nextInt(2) == 0) {
+                        vanish();
+                        return;
                     }
                 } else {
-                    if (this.age % 5 == 0) this.getNavigation().startMovingTo(target, 0.6);
-                    if (this.blinkCooldown <= 0) {
-                        this.blinkCooldown = 80 + this.random.nextInt(120);
-                        if (dist > 10 && this.random.nextInt(3) == 0) blink(target);
+                    if (dist < 20 && this.age % 40 == 0) heartbeat(target, 0.9f);
+
+                    if (observed) {
+                        this.getNavigation().stop();
+                        if (dist > 30) {
+                            if (this.blinkCooldown <= 0) {
+                                this.blinkCooldown = 60;
+                                blink(target);
+                            }
+                        } else {
+                            setState(CRAWL);
+                        }
+                    } else {
+                        if (this.age % 5 == 0) this.getNavigation().startMovingTo(target, 0.6);
+                        if (this.blinkCooldown <= 0) {
+                            this.blinkCooldown = 80 + this.random.nextInt(120);
+                            if (dist > 10 && this.random.nextInt(3) == 0) blink(target);
+                        }
+                        if (dist < 2.5) jumpscare(target);
                     }
-                    if (dist < 2.5) jumpscare(target);
                 }
             }
             case CRAWL -> {
@@ -252,4 +275,4 @@ public class StalkerEntity extends HostileEntity {
     protected SoundEvent getDeathSound() {
         return SoundEvents.ENTITY_ENDERMAN_DEATH;
     }
-                }
+    }
