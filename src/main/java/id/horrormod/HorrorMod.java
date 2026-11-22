@@ -1,5 +1,6 @@
 package id.horrormod;
 
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -12,6 +13,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.server.command.CommandManager;
+import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -32,7 +34,7 @@ public class HorrorMod implements ModInitializer {
             Registries.ENTITY_TYPE,
             new Identifier(MODID, "stalker"),
             FabricEntityTypeBuilder.create(SpawnGroup.MONSTER, StalkerEntity::new)
-                    .dimensions(EntityDimensions.fixed(0.6f, 1.95f))
+                    .dimensions(EntityDimensions.fixed(0.6f, 2.3f))
                     .trackRangeBlocks(64)
                     .build());
 
@@ -69,11 +71,11 @@ public class HorrorMod implements ModInitializer {
                             s, SoundCategory.AMBIENT, 1.0f, 0.5f + r.nextFloat() * 0.3f);
                 }
 
-                // Stalker muncul di tempat gelap
+                // Stalker muncul di tempat gelap (jenis diacak: pengintai atau pemburu)
                 boolean dark = world.getLightLevel(p.getBlockPos()) < 6;
                 if (dark && r.nextInt(150) == 0
                         && world.getEntitiesByType(STALKER, p.getBoundingBox().expand(64), e -> true).isEmpty()) {
-                    spawnNear(world, p);
+                    spawnNear(world, p, true, false);
                 }
             }
         });
@@ -81,13 +83,18 @@ public class HorrorMod implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 dispatcher.register(CommandManager.literal("stalker")
                         .requires(src -> src.hasPermissionLevel(2))
-                        .executes(ctx -> {
-                            ServerPlayerEntity p = ctx.getSource().getPlayerOrThrow();
-                            boolean ok = spawnNear(p.getServerWorld(), p);
-                            ctx.getSource().sendFeedback(
-                                    () -> Text.literal(ok ? "Stalker muncul..." : "Tidak ada tempat untuk spawn"), false);
-                            return ok ? 1 : 0;
-                        })));
+                        .executes(ctx -> runSpawn(ctx.getSource(), true, false))
+                        .then(CommandManager.literal("hunt")
+                                .executes(ctx -> runSpawn(ctx.getSource(), true, true)))
+                        .then(CommandManager.literal("near")
+                                .executes(ctx -> runSpawn(ctx.getSource(), false, true)))));
+    }
+
+    private static int runSpawn(ServerCommandSource src, boolean far, boolean hunter) throws CommandSyntaxException {
+        ServerPlayerEntity p = src.getPlayerOrThrow();
+        boolean ok = spawnNear(p.getServerWorld(), p, far, hunter);
+        src.sendFeedback(() -> Text.literal(ok ? "Stalker muncul..." : "Tidak ada tempat untuk spawn"), false);
+        return ok ? 1 : 0;
     }
 
     // Cari tempat berdiri yang aman di sekitar pemain pada arah tertentu
@@ -109,18 +116,28 @@ public class HorrorMod implements ModInitializer {
         return null;
     }
 
-    public static boolean spawnNear(ServerWorld world, ServerPlayerEntity p) {
+    // far = true: di depan pemain pada jarak 28-38 blok. far = false: dekat di belakang pemain.
+    // hunter = true: dipaksa jadi pemburu (menyerang).
+    public static boolean spawnNear(ServerWorld world, ServerPlayerEntity p, boolean far, boolean hunter) {
         Random r = world.getRandom();
-        BlockPos spot = findSpot(world, p, Math.toRadians(p.getYaw() + 270), 16, 26);
-        if (spot == null) spot = findSpot(world, p, r.nextDouble() * Math.PI * 2, 14, 24);
+        BlockPos spot;
+        if (far) {
+            spot = findSpot(world, p, Math.toRadians(p.getYaw() + 90), 26, 34);
+            if (spot == null) spot = findSpot(world, p, r.nextDouble() * Math.PI * 2, 24, 34);
+        } else {
+            spot = findSpot(world, p, Math.toRadians(p.getYaw() + 270), 14, 22);
+            if (spot == null) spot = findSpot(world, p, r.nextDouble() * Math.PI * 2, 12, 20);
+        }
         if (spot == null) return false;
 
         StalkerEntity e = STALKER.create(world);
         if (e == null) return false;
         e.refreshPositionAndAngles(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, r.nextFloat() * 360f, 0f);
+        if (!far) e.skipWatch();
+        if (hunter) e.makeHunter();
         world.spawnEntity(e);
         world.playSound(null, p.getX(), p.getY(), p.getZ(),
                 SoundEvents.ENTITY_WARDEN_HEARTBEAT, SoundCategory.AMBIENT, 1.5f, 0.8f);
         return true;
     }
-    }
+                                  }
